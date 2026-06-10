@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web服务器实现原理 - 我的技术博客</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>我的技术博客</h1>
+            <p>分享技术心得，记录成长之路</p>
+            <nav>
+                <a href="/">首页</a>
+                <a href="/about.html">关于</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <a href="/" class="back-link">← 返回首页</a>
+        
+        <article class="card article-content">
+            <h2>Web服务器实现原理</h2>
+            <div class="meta">2024年1月15日 · Web开发</div>
+            
+            <!-- 可以在这里插入文章封面图，建议尺寸：1200x600px -->
+            <!-- <img src="/images/post1-cover.png" alt="Web服务器" style="width:100%;border-radius:12px;margin-bottom:30px;box-shadow:0 4px 12px rgba(0,0,0,0.1);"> -->
+            
+            <h3>什么是Web服务器</h3>
+            <p>Web服务器是一种运行在服务器端的软件，负责接收客户端的HTTP请求，处理请求并返回相应的HTTP响应。常见的Web服务器有Apache、Nginx等。</p>
+
+            <h3>Socket编程基础</h3>
+            <p>Socket是网络通信的基础，它提供了一种机制让不同主机上的进程能够进行通信。在Python中，我们可以使用<code>socket</code>模块来创建Socket连接。</p>
+            
+            <!-- 可以在这里插入Socket示意图 -->
+            <!-- <img src="/images/socket-diagram.png" alt="Socket示意图" style="width:100%;max-width:800px;display:block;margin:20px auto;border-radius:8px;"> -->
+
+            <h3>HTTP协议解析</h3>
+            <p>HTTP协议是Web通信的核心，它定义了客户端和服务器之间的通信规则。一个HTTP请求通常包含请求行、请求头和请求体。</p>
+
+            <h3>多线程并发处理</h3>
+            <p>为了同时处理多个客户端请求，Web服务器需要支持并发。常见的并发模型包括多线程、多进程和异步IO。</p>
+
+            <h3>代码示例</h3>
+            <pre><code>import socket
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind(('0.0.0.0', 8080))
+server.listen(10)
+
+while True:
+    client, addr = server.accept()
+    data = client.recv(1024)
+    client.send(b'HTTP/1.0 200 OK\r\n\r\nHello World')
+    client.close()</code></pre>
+
+            <h3>总结</h3>
+            <p>通过学习Web服务器的实现原理，我们可以更好地理解HTTP协议和网络编程的核心概念，为构建更高效的Web应用打下坚实基础。</p>
+        </article>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 我的技术博客. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
