@@ -41,12 +41,12 @@ def resolve_path(url_path: str) -> tuple:
     5. 安全检查：确保最终路径在DOC_ROOT目录下（防止路径穿越攻击）
     
     安全示例：
-        /index.html → D:\...\www\index.html ✓
-        /article/post1.html → D:\...\www\article\post1.html ✓
+        /index.html → D:\\...\\www\\index.html ✓
+        /article/post1.html → D:\\...\\www\\article\\post1.html ✓
     
     危险示例（会被拦截）：
         /../../etc/passwd → 超出DOC_ROOT范围，返回(None, False) ✗
-        /..\\..\\windows\system32 → 路径穿越，返回(None, False) ✗
+        /..\\..\\windows\\system32 → 路径穿越，返回(None, False) ✗
     
     参数：
         url_path: URL中的路径部分（如/index.html、/article/post1.html）
@@ -66,12 +66,12 @@ def resolve_path(url_path: str) -> tuple:
         url_path = url_path[1:]
     
     # 【步骤3】拼接完整路径
-    # 例如：DOC_ROOT="D:\...\www", url_path="about.html"
-    # 结果：file_path="D:\...\www\about.html"
+    # 例如：DOC_ROOT="D:\\...\\www", url_path="about.html"
+    # 结果：file_path="D:\\...\\www\\about.html"
     file_path = os.path.join(DOC_ROOT, url_path)
     
     # 【步骤4】规范化路径：处理/../等特殊路径
-    # 例如：D:\...\www\article\..\about.html → D:\...\www\about.html
+    # 例如：D:\\...\\www\\article\\..\\about.html → D:\\...\\www\\about.html
     file_path = os.path.normpath(file_path)
     
     # 【步骤5】获取真实路径：解析符号链接等（Windows下通常与normpath相同）
@@ -94,7 +94,7 @@ def get_mime_type(file_path: str) -> str:
     MIME类型用于HTTP响应头的Content-Type字段，告诉浏览器如何解析内容
     
     参数：
-        file_path: 文件的完整路径（如D:\...\www\style.css）
+        file_path: 文件的完整路径（如D:\\...\\www\\style.css）
     
     返回：
         MIME类型字符串（如'text/css; charset=utf-8'）

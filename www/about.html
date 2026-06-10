@@ -13,15 +13,17 @@
             <p>分享技术心得，记录成长之路</p>
             <nav>
                 <a href="/">首页</a>
-                <a href="/about.html">关于</a>
+                <a href="/about.html">关于我</a>
+                <a href="/article/post1.html">技术文章</a>
             </nav>
         </div>
     </header>
 
     <main class="container">
-        <section class="card about-content">
-            <!-- 请在这里插入你的头像图片，建议尺寸：400x400px -->
-            <img src="/avatar.png" alt="头像" class="avatar" onerror="this.style.display='none'; this.parentElement.innerHTML += '<div style=\'width:180px;height:180px;border-radius:50%;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);margin:0 auto 25px;display:flex;align-items:center;justify-content:center;color:white;font-size:3rem;margin-bottom:25px;border:5px solid white;box-shadow:0 8px 24px rgba(0, 0, 0, 0.2);\'>👤</div>'">
+        <section class="card about-card">
+            <div class="avatar-wrapper">
+                <div class="avatar">👨‍💻</div>
+            </div>
             <h2>关于我</h2>
             <p>大家好，我是一名热爱编程的开发者，专注于Web开发领域。</p>
             <p>在过去的几年里，我积累了丰富的开发经验，涉及前端、后端和DevOps等多个领域。</p>
@@ -31,12 +33,38 @@
 
         <section class="card">
             <h2>技术栈</h2>
-            <ul>
-                <li>Python / Django / Flask</li>
-                <li>JavaScript / Vue.js / React</li>
-                <li>Linux / Docker / Nginx</li>
-                <li>MySQL / Redis / MongoDB</li>
-            </ul>
+            <div class="tech-stack">
+                <span class="tech-tag">Python</span>
+                <span class="tech-tag">Django</span>
+                <span class="tech-tag">Flask</span>
+                <span class="tech-tag">JavaScript</span>
+                <span class="tech-tag">Vue.js</span>
+                <span class="tech-tag">React</span>
+                <span class="tech-tag">Linux</span>
+                <span class="tech-tag">Docker</span>
+                <span class="tech-tag">Nginx</span>
+                <span class="tech-tag">MySQL</span>
+                <span class="tech-tag">Redis</span>
+                <span class="tech-tag">MongoDB</span>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>联系方式</h2>
+            <div class="contact-list">
+                <div class="contact-item">
+                    <span class="contact-icon">📧</span>
+                    <span>zhangsan@email.com</span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-icon">📱</span>
+                    <span>138-0000-0000</span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-icon">📍</span>
+                    <span>北京</span>
+                </div>
+            </div>
         </section>
     </main>
 

@@ -53,6 +53,8 @@ def build_response(status_code: int, content_type: str, body: bytes) -> bytes:
         f"Content-Type: {content_type}",            # 内容类型（含字符编码）
         f"Content-Length: {content_length}",        # 内容长度（字节数）
         "Connection: close",                        # 短连接（HTTP/1.0默认行为）
+        "Cache-Control: public, max-age=86400",     # 缓存控制：允许缓存24小时
+        "Expires: Wed, 31 Dec 2025 23:59:59 GMT",   # 过期时间（远未来）
         ""                                          # 空行：分隔头部和主体
     ]
     

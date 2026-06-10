@@ -8,19 +8,16 @@
 
 ### 1.2 业务场景
 
-搭建的个人技术博客包含以下资源：
+搭建的个人主页网站包含以下资源：
 
 ```
 www/
-├── index.html          # 博客首页，包含文章列表和导航
-├── about.html          # 关于页面，个人介绍
-├── style.css           # 全局CSS样式表
-└── article/
-    ├── post1.html      # 第一篇文章：Web服务器实现原理
-    └── post2.html      # 第二篇文章：多线程编程最佳实践
+├── index.html          # 个人主页首页，包含头像、名片、自我介绍等模块
+├── about.html          # 关于页面，个人详细信息和联系方式
+└── style.css           # 全局CSS样式表
 ```
 
-用户通过浏览器访问 `http://localhost:8080` 即可浏览博客。点击链接在页面间跳转，CSS样式正常加载，图片正常显示。访问不存在的路径返回404错误页面。
+用户通过浏览器访问 `http://localhost:8080` 即可浏览个人主页。页面包含四个主要模块：个人头像、个人名片、自我介绍、其他补充（兴趣爱好和人生格言）。
 
 ### 1.3 开发环境
 
@@ -38,12 +35,9 @@ www/
 ```
 webserver/
 ├── www/                        # 文档根目录（Web资源存放处）
-│   ├── index.html              # 博客首页
+│   ├── index.html              # 个人主页首页
 │   ├── about.html              # 关于页面
-│   ├── style.css               # 全局样式表
-│   └── article/
-│       ├── post1.html          # 文章一：Web服务器实现原理
-│       └── post2.html          # 文章二：多线程编程最佳实践
+│   └── style.css               # 全局样式表
 ├── src/                        # 源代码目录
 │   ├── main.py                 # 主程序入口，Socket通信与多线程管理
 │   ├── http_parser.py          # HTTP请求解析模块
@@ -178,10 +172,8 @@ python src/main.py
 
 | 页面 | URL |
 |------|-----|
-| 首页 | `http://localhost:8080/` |
-| 关于页 | `http://localhost:8080/about.html` |
-| 文章一 | `http://localhost:8080/article/post1.html` |
-| 文章二 | `http://localhost:8080/article/post2.html` |
+| 个人主页首页 | `http://localhost:8080/` |
+| 关于我 | `http://localhost:8080/about.html` |
 
 ---
 
