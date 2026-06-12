@@ -267,7 +267,7 @@ def get_mime_type(file_path: str) -> str:
     参数：
         file_path: 文件的完整路径
                   【类型】str
-                  【示例】D:\www\style.css
+                  【示例】D:\\www\\style.css
     
     返回：
         MIME类型字符串
@@ -325,7 +325,7 @@ def read_file(file_path: str) -> tuple:
     参数：
         file_path: 要读取的文件绝对路径
                   【类型】str
-                  【示例】D:\www\index.html
+                  【示例】D:\\www\\index.html
     
     返回：
         元组 (success, content, mime_type)
