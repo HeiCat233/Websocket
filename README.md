@@ -20,8 +20,6 @@ www/
     └── post2.html      # 第二篇文章：多线程编程最佳实践
 ```
 
-用户通过浏览器访问 `http://localhost:8080` 即可浏览博客。点击链接在页面间跳转，CSS样式正常加载，图片正常显示。访问不存在的路径返回404错误页面。
-
 ### 1.3 开发环境
 
 | 项目 | 要求 |
@@ -45,10 +43,16 @@ webserver/
 │       ├── post1.html          # 文章一：Web服务器实现原理
 │       └── post2.html          # 文章二：多线程编程最佳实践
 ├── src/                        # 源代码目录
-│   ├── main.py                 # 主程序入口，Socket通信与多线程管理
-│   ├── http_parser.py          # HTTP请求解析模块
-│   ├── http_response.py        # HTTP响应生成模块
-│   └── file_handler.py         # 文件处理模块
+│   ├── __init__.py             # 包初始化模块
+│   ├── main.py                 # 程序入口
+│   ├── config.py               # 【新增】配置管理模块
+│   ├── utils.py                # 【新增】工具函数模块
+│   ├── request.py              # 【重构】请求处理模块
+│   ├── response.py             # 【重构】响应生成模块
+│   ├── storage.py              # 【重构】文件处理模块（数据访问层）
+│   ├── middleware.py           # 【新增】中间件模块
+│   ├── router.py               # 【新增】路由处理模块
+│   └── server.py               # 【重构】服务器核心模块
 └── README.md                   # 项目说明文档
 ```
 
@@ -56,221 +60,296 @@ webserver/
 
 ## 三、模块功能说明
 
-### 3.1 模块一：HTTP请求解析器（`http_parser.py`）
+### 3.1 配置管理模块（`config.py`）
 
-**职责：** 解析客户端发来的原始HTTP请求报文，提取请求行中的方法、路径、版本信息。
+**职责：** 集中管理Web服务器的所有配置参数。
+
+**设计特点：**
+- 单一数据源：所有配置集中在一个地方
+- 环境变量支持：可通过环境变量覆盖
+- 类型安全：明确的类型定义
+- 默认值：合理的默认值
+
+**核心类：**
+
+| 类/函数 | 功能说明 |
+|--------|---------|
+| `ServerConfig` | 服务器配置类，封装所有配置项 |
+| `config` | 全局配置单例实例 |
+
+**配置项分类：**
+
+| 分类 | 配置项 | 默认值 |
+|------|--------|--------|
+| 服务器基础 | HOST, PORT | 0.0.0.0, 8080 |
+| 并发处理 | BACKLOG, THREAD_POOL_SIZE, QUEUE_SIZE | 10, 4, 128 |
+| 超时设置 | BUFFER_SIZE, CLIENT_TIMEOUT, ACCEPT_TIMEOUT | 8192, 30.0, 1.0 |
+| 其他 | SERVER_NAME, DEFAULT_PAGE, CACHE_MAX_AGE | SimplePythonServer/1.0, index.html, 86400 |
+
+---
+
+### 3.2 工具函数模块（`utils.py`）
+
+**职责：** 提供通用工具函数。
+
+**核心函数：**
+
+| 函数 | 功能说明 |
+|------|---------|
+| `url_decode(url_string)` | URL解码，将百分号编码转换为原始字符 |
+| `url_encode(text)` | URL编码，将特殊字符转换为百分号编码 |
+| `safe_dict_get(dictionary, key, default)` | 安全获取字典值 |
+
+---
+
+### 3.3 请求处理模块（`request.py`）
+
+**职责：** 负责HTTP请求的解析，提取请求信息。
 
 **核心类与函数：**
 
 | 名称 | 类型 | 功能说明 |
 |------|------|---------|
-| `HTTPRequest` | 类 | 封装解析后的HTTP请求信息，包含 `method`、`path`、`version`、`raw_data` 四个属性 |
-| `parse_request(raw_data: bytes) -> HTTPRequest` | 函数 | 解析原始HTTP请求字节数据，返回 `HTTPRequest` 对象 |
-| `url_decode(url_string: str) -> str` | 函数 | 对URL中的百分号编码（如 `%20`）进行解码 |
+| `HTTPRequest` | 类 | 数据类，封装请求信息（method, path, version, raw_data） |
+| `parse_request(raw_data)` | 函数 | 解析原始HTTP请求字节数据 |
+| `RequestValidator` | 类 | 请求验证器，提供方法验证 |
 
-**处理流程：**
+**HTTPRequest数据类属性：**
 
-1. 将接收到的字节数据解码为UTF-8字符串
-2. 按 `\r\n` 分割数据行，提取第一行作为请求行
-3. 按空格分割请求行，依次提取方法、路径、HTTP版本
-4. 对路径调用 `url_decode()` 进行URL解码
-5. 将解析结果封装到 `HTTPRequest` 对象中返回
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `method` | str | HTTP方法（GET、POST等） |
+| `path` | str | 请求路径（如/index.html） |
+| `version` | str | HTTP版本（如HTTP/1.0） |
+| `raw_data` | bytes | 原始请求字节数据 |
 
-**URL解码规则：**
-- `%XX` 格式的十六进制编码转为对应ASCII字符
-- `+` 号转为空格
-- 至少支持 `%20`（空格）、`%2F`（斜杠）的解码
-
-**边界情况处理：**
-- 请求数据为空时，返回空对象
-- 请求行字段不足时，仅解析可用字段
-- 非法十六进制编码时，保留原字符
+**RequestValidator验证规则：**
+- 请求方法必须是GET
+- 请求路径必须合法
+- 不包含危险字符（.., \\）
 
 ---
 
-### 3.2 模块二：HTTP响应生成器（`http_response.py`）
+### 3.4 响应生成模块（`response.py`）
 
-**职责：** 根据处理结果生成符合HTTP/1.0规范的响应报文。
+**职责：** 负责HTTP响应的生成，构造符合HTTP协议的响应报文。
 
-**核心函数：**
+**核心类与函数：**
 
 | 名称 | 功能说明 |
 |------|---------|
-| `build_response(status_code, content_type, body) -> bytes` | 构造完整的HTTP响应报文 |
-| `build_error_response(status_code) -> bytes` | 快捷构造HTML格式的错误响应页面 |
+| `HTTPResponse` | 响应类，封装响应信息，支持链式调用 |
+| `build_response(status_code, content_type, body)` | 快捷构建HTTP响应 |
+| `build_error_response(status_code)` | 构建HTML错误页面 |
+| `get_error_description(status_code)` | 获取错误描述 |
 
-**响应报文格式：**
+**HTTPResponse类特点：**
+- 使用`to_bytes()`方法转换为完整的HTTP响应字节
+- 自动添加Server、Content-Type、Content-Length等头部
+- 支持自定义头部
 
-```
-HTTP/1.0 {状态码} {状态短语}\r\n
-Server: SimplePythonServer/1.0\r\n
-Content-Type: {MIME类型}\r\n
-Content-Length: {消息体字节数}\r\n
-Connection: close\r\n
-\r\n
-{消息体内容}
-```
-
-**支持的状态码：**
-
-| 状态码 | 状态短语 | 触发场景 |
-|--------|---------|---------|
-| 200 | OK | 请求资源成功 |
-| 403 | Forbidden | 路径穿越攻击被拦截 |
-| 404 | Not Found | 请求的资源不存在 |
-| 405 | Method Not Allowed | 使用了GET以外的方法 |
-| 500 | Internal Server Error | 服务器内部异常 |
-
-**错误页面设计：**
-
-`build_error_response()` 生成的HTML页面需包含：
-- 大号状态码显示
-- 状态短语说明
-- 错误描述文字
-- 返回首页的链接
-- 简洁美观的内嵌CSS样式
+**支持的状态码：** 200, 400, 403, 404, 405, 408, 500
 
 ---
 
-### 3.3 模块三：文件处理器（`file_handler.py`）
+### 3.5 文件处理模块（`storage.py`）
 
 **职责：** 处理所有文件系统操作，包括路径解析、安全检查、MIME类型映射、文件读取。
 
-**核心函数：**
+**核心类：**
+
+| 类 | 功能说明 |
+|------|---------|
+| `PathResolver` | 路径解析器，负责URL到文件路径的转换和安全检查 |
+| `FileHandler` | 文件处理器，负责读取文件内容 |
+
+**PathResolver处理流程：**
+1. 处理默认首页（/ → /index.html）
+2. 去除前导斜杠
+3. 拼接文档根目录
+4. 规范化路径（处理.和..）
+5. 安全边界检查
+
+**FileHandler读取流程：**
+1. 解析文件路径
+2. 检查路径安全性
+3. 验证文件存在且为普通文件
+4. 读取文件内容
+5. 返回内容和MIME类型
+
+**MIME类型支持：** .html, .css, .js, .png, .jpg, .gif, .txt等
+
+---
+
+### 3.6 中间件模块（`middleware.py`）
+
+**职责：** 提供请求处理的中间件机制，支持请求/响应的预处理。
+
+**核心概念：**
+- 中间件是一种拦截器模式
+- 请求经过多个中间件形成处理链
+- 支持快速失败（短路响应）
+
+**核心类与函数：**
 
 | 名称 | 功能说明 |
 |------|---------|
-| `resolve_path(url_path: str) -> tuple` | 将URL路径解析为文件系统绝对路径，并做安全检查 |
-| `get_mime_type(file_path: str) -> str` | 根据文件扩展名返回对应的MIME类型 |
-| `read_file(file_path: str) -> tuple` | 读取文件内容，返回成功标志、内容和MIME类型 |
+| `MiddlewareChain` | 中间件链管理器，管理中间件的执行顺序 |
+| `logging_middleware` | 日志记录中间件 |
+| `method_validator_middleware` | 方法验证中间件 |
+| `RequestLogger` | 请求日志记录器 |
 
-**路径解析规则：**
+**中间件签名：**
+```python
+Middleware = Callable[[HTTPRequest], Tuple[bool, Optional[HTTPResponse]]]
+```
 
-1. 若请求路径为 `/`，自动映射到 `/index.html`
-2. 去掉路径开头的 `/`，与文档根目录拼接
-3. 使用 `os.path.normpath()` 规范化路径（处理 `.` 和 `..`）
-4. 使用 `os.path.realpath()` 解析真实绝对路径
-5. 验证真实路径是否在文档根目录之内，防止路径穿越攻击
-
-**MIME类型映射表（至少支持）：**
-
-| 扩展名 | MIME类型 |
-|--------|---------|
-| .html / .htm | text/html |
-| .css | text/css |
-| .js | application/javascript |
-| .png | image/png |
-| .jpg / .jpeg | image/jpeg |
-| .gif | image/gif |
-| .txt | text/plain |
-| 其他 | application/octet-stream |
-
-**文件读取逻辑：**
-
-1. 检查路径是否存在且为普通文件（非目录）
-2. 以二进制模式打开文件，读取全部内容
-3. 根据扩展名获取对应MIME类型
-4. 若文件不存在或无法读取，返回失败标志
-5. 捕获 `IOError` 和 `PermissionError` 异常
+**使用示例：**
+```python
+chain = MiddlewareChain()
+chain.use(logging_middleware)
+chain.use(method_validator_middleware)
+should_continue, response = chain.execute(request)
+```
 
 ---
 
-### 3.4 主程序（`main.py`）
+### 3.7 路由处理模块（`router.py`）
 
-**职责：** 整合所有模块，实现完整的Web服务器功能，包括Socket通信和多线程并发处理。
+**职责：** 管理请求路由，将URL路径映射到对应的处理函数。
 
-**配置常量：**
+**核心类：**
 
-| 常量名 | 建议值 | 说明 |
-|--------|--------|------|
-| `HOST` | `'0.0.0.0'` | 监听所有网络接口 |
-| `PORT` | `8080` | 监听端口号 |
-| `BACKLOG` | `10` | 最大等待连接队列长度 |
-| `THREAD_POOL_SIZE` | `4` | 工作线程数量 |
-| `QUEUE_SIZE` | `128` | 任务队列最大容量 |
-| `BUFFER_SIZE` | `8192` | 接收数据缓冲区大小（字节） |
+| 类 | 功能说明 |
+|------|---------|
+| `Route` | 路由类，封装路由信息 |
+| `StaticFileHandler` | 静态文件处理器 |
+| `Router` | 路由管理器，处理请求分发 |
 
-**全局变量：**
+**Router特点：**
+- 支持静态路由注册
+- 支持路由装饰器（`@router.route('/path')`）
+- 未匹配路由自动使用静态文件处理器
 
-| 变量名 | 类型 | 说明 |
-|--------|------|------|
-| `shutdown_flag` | `threading.Event` | 全局关闭标志，用于协调所有线程优雅退出 |
-| `server_socket` | `socket.socket` | 全局服务器Socket引用，用于信号处理中关闭Socket |
-
-**核心函数：**
-
-| 函数名 | 功能说明 |
-|--------|---------|
-| `handle_client(client_socket, client_address)` | 处理单个客户端连接的完整流程（由工作线程调用） |
-| `worker_thread(task_queue)` | 工作线程主循环，从队列获取任务并调用 `handle_client` |
-| `signal_handler(signum, frame)` | SIGINT信号处理器，触发优雅关闭 |
-| `main()` | 主函数，服务器启动、运行、关闭的完整流程 |
-
-**`handle_client` 处理流程：**
-
-1. 设置客户端Socket超时（30秒）
-2. 调用 `socket.recv()` 接收HTTP请求数据
-3. 调用 `http_parser.parse_request()` 解析请求
-4. 验证请求方法：非GET方法返回405错误
-5. 调用 `file_handler.resolve_path()` 解析文件路径
-6. 检查路径安全性：不安全返回403错误
-7. 调用 `file_handler.read_file()` 读取文件
-8. 文件存在：调用 `http_response.build_response(200, ...)` 返回文件内容
-9. 文件不存在：调用 `http_response.build_error_response(404)` 返回错误页面
-10. 异常情况：返回500错误页面
-11. 通过 `socket.sendall()` 发送响应数据
-12. 打印格式化的请求处理日志
-13. 关闭客户端Socket
-
-**日志输出格式：**
+**使用示例：**
+```python
+@router.route('/about')
+def about_page(request):
+    return HTTPResponse(200, 'text/html', content)
 ```
-[Thread-{线程ID}] GET {请求路径} → {状态码} {状态短语} ({响应字节数} bytes)
-```
-
-**`worker_thread` 主循环逻辑：**
-
-1. 进入无限循环，从任务队列获取 `(client_socket, client_address)` 元组
-2. 若取到 `(None, None)` 关闭标记，退出循环
-3. 否则调用 `handle_client()` 处理请求
-4. 使用 `queue.get(timeout=1)` 实现带超时的阻塞获取，允许定期检查关闭标志
-
-**`signal_handler` 处理逻辑：**
-
-1. 打印关闭提示信息
-2. 设置 `shutdown_flag` 事件
-3. 关闭服务器Socket以解除主线程 `accept()` 阻塞
-
-**`main` 主函数流程：**
-
-1. **初始化阶段：**
-   - 注册 `SIGINT` 信号处理器
-   - 创建任务队列 `queue.Queue(QUEUE_SIZE)`
-   - 创建TCP Socket：`socket.socket(socket.AF_INET, socket.SOCK_STREAM)`
-   - 设置 `SO_REUSEADDR` 选项，允许端口复用
-   - 绑定地址 `bind((HOST, PORT))`
-   - 开始监听 `listen(BACKLOG)`
-
-2. **启动线程池：**
-   - 创建 `THREAD_POOL_SIZE` 个工作线程
-   - 每个线程执行 `worker_thread(task_queue)`
-   - 线程设为守护线程（`daemon=True`）
-
-3. **主循环（接收连接）：**
-   - 使用 `server_socket.accept()` 接收客户端连接
-   - 设置超时（1秒），允许定期检查关闭标志
 
 ---
 
-## 四、运行方式
+### 3.8 服务器核心模块（`server.py`）
 
-### 4.1 启动服务器
+**职责：** 实现Web服务器的核心功能，包括Socket通信、多线程处理。
+
+**核心类：**
+
+| 类 | 功能说明 |
+|------|---------|
+| `ClientHandler` | 客户端处理器，处理单个客户端请求 |
+| `WorkerThread` | 工作线程，从队列获取任务并处理 |
+| `WebServer` | Web服务器主类，整合所有组件 |
+
+**架构设计：**
+- 生产者-消费者模式
+- 主线程：接收连接，生产任务
+- 工作线程池：处理请求，消费任务
+
+**WebServer主流程：**
+1. 创建TCP Socket
+2. 启动工作线程池
+3. 主循环接收连接
+4. 任务加入队列
+5. 优雅关闭
+
+---
+
+### 3.9 程序入口（`main.py`）
+
+**职责：** 提供程序入口，启动Web服务器。
+
+**启动方式：**
+```bash
+python src/main.py
+```
+
+---
+
+## 四、模块依赖关系
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         main.py                              │
+│                      (程序入口)                                │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       server.py                              │
+│               WebServer, WorkerThread                        │
+└──────────┬──────────────────┬───────────────────┬──────────┘
+           │                  │                   │
+           ▼                  ▼                   ▼
+┌──────────────────┐ ┌────────────────┐ ┌────────────────────┐
+│    router.py     │ │  middleware.py │ │     request.py     │
+│   Router         │ │ MiddlewareChain│ │   HTTPRequest      │
+│ StaticFileHandler│ │                │ │  parse_request     │
+└────────┬─────────┘ └───────┬────────┘ └────────┬───────────┘
+         │                   │                  │
+         │                   │                  │
+         ▼                   │                  ▼
+┌──────────────────┐        │         ┌────────────────────┐
+│    storage.py    │        │         │    response.py     │
+│  PathResolver    │        │         │   HTTPResponse      │
+│   FileHandler    │        │         │  build_response     │
+└──────────────────┘        │         └────────────────────┘
+                           │
+                           ▼
+                  ┌────────────────────┐
+                  │     config.py       │
+                  │   ServerConfig      │
+                  │      config         │
+                  └────────────────────┘
+```
+
+---
+
+## 五、配置管理
+
+### 5.1 环境变量配置
+
+| 环境变量 | 说明 | 默认值 |
+|----------|------|--------|
+| SERVER_HOST | 监听地址 | 0.0.0.0 |
+| SERVER_PORT | 监听端口 | 8080 |
+| DOCUMENT_ROOT | 文档根目录 | {项目根目录}/www |
+| BACKLOG | 连接队列大小 | 10 |
+| THREAD_POOL_SIZE | 工作线程数 | 4 |
+| QUEUE_SIZE | 任务队列容量 | 128 |
+| BUFFER_SIZE | 接收缓冲区大小 | 8192 |
+| CLIENT_TIMEOUT | 客户端超时 | 30.0 |
+| ACCEPT_TIMEOUT | accept超时 | 1.0 |
+
+### 5.2 配置优先级
+
+```
+环境变量 > 代码默认值
+```
+
+---
+
+## 六、运行方式
+
+### 6.1 启动服务器
 
 ```bash
 cd webserver
 python src/main.py
 ```
 
-### 4.2 服务器启动信息
+### 6.2 服务器启动信息
 
 ```
 服务器已启动，监听 http://0.0.0.0:8080
@@ -279,9 +358,9 @@ python src/main.py
 按 Ctrl+C 停止服务器
 ```
 
-### 4.3 访问方式
+### 6.3 访问方式
 
-在浏览器中访问以下地址：
+在浏览器中访问：
 
 | 页面 | URL |
 |------|-----|
@@ -292,9 +371,9 @@ python src/main.py
 
 ---
 
-## 五、功能特性
+## 七、功能特性
 
-### 5.1 核心功能
+### 7.1 核心功能
 
 - ✅ 静态文件服务（HTML、CSS、JavaScript、图片等）
 - ✅ HTTP/1.0 协议支持
@@ -302,115 +381,65 @@ python src/main.py
 - ✅ 任务队列缓冲
 - ✅ 优雅关闭机制
 
-### 5.2 安全特性
+### 7.2 安全特性
 
 - ✅ 路径穿越攻击防护
 - ✅ 请求方法限制（仅支持GET）
 - ✅ 文件权限检查
 
-### 5.3 错误处理
+### 7.3 错误处理
 
 - ✅ 404 页面未找到
 - ✅ 403 访问禁止
 - ✅ 405 方法不允许
+- ✅ 408 请求超时
 - ✅ 500 服务器内部错误
 
 ---
 
-## 六、代码注释说明
+## 八、代码注释说明
 
-本项目所有源代码均包含详细的中文注释，方便学习和理解：
+### 8.1 注释风格
 
-### 6.1 注释风格
+- **模块级注释**：说明模块职责、功能、设计原则
+- **类注释**：说明类的职责、属性、使用方式
+- **函数注释**：说明函数功能、参数、返回值、处理流程
+- **行内注释**：解释关键代码的设计决策
 
-每个模块开头包含：
-- **模块功能说明**：概述模块职责
-- **技术背景知识**：HTTP协议基础、Socket编程概念
-- **关键设计思路**：为什么这样设计，有什么替代方案
+### 8.2 学习路径
 
-### 6.2 函数注释
-
-每个函数包含：
-- **功能说明**：函数做什么
-- **参数说明**：每个参数的类型、含义、示例
-- **返回值说明**：返回值的类型、含义
-- **处理流程**：用流程图或步骤说明执行过程
-- **边界情况**：可能出现的异常和错误处理
-
-### 6.3 行内注释
-
-关键代码行包含：
-- **为什么这样做**：解释设计决策
-- **替代方案**：是否有其他实现方式
-- **潜在问题**：可能的风险和注意事项
-
-### 6.4 学习建议
-
-1. **从main.py开始**：了解服务器的整体架构
-2. **理解handle_client流程**：掌握请求处理的完整流程
-3. **学习http_parser**：理解HTTP协议解析原理
-4. **研究http_response**：掌握响应报文构建方法
-5. **分析file_handler**：理解路径安全和文件读取
+1. **config.py**：了解配置管理机制
+2. **request.py**：理解HTTP请求解析
+3. **response.py**：掌握响应报文构建
+4. **storage.py**：学习路径安全和文件处理
+5. **middleware.py**：理解中间件模式
+6. **router.py**：掌握路由分发
+7. **server.py**：理解服务器核心架构
 
 ---
 
-## 七、技术亮点
+## 九、扩展建议
 
-1. **底层Socket编程**：从零实现TCP连接管理和HTTP协议解析
-2. **多线程架构**：采用线程池 + 任务队列模式，支持高并发
-3. **安全设计**：完整的路径安全检查，防止目录遍历攻击
-4. **模块化设计**：代码结构清晰，职责分离，易于维护和扩展
-5. **优雅关闭**：支持信号处理，确保所有连接和线程正常退出
-6. **详细注释**：每个模块、函数、关键代码行都有详细注释，方便学习
-
----
-
-## 八、扩展建议
-
-### 8.1 功能扩展
+### 9.1 功能扩展
 
 - 支持HTTP/1.1的Keep-Alive长连接
-- 实现简单的目录列表功能
-- 添加Gzip压缩支持
-- 实现POST/PUT等方法的文件上传功能
+- 实现动态路由和路由参数
+- 添加POST/PUT等方法的文件上传
+- 实现简单的模板引擎
 
-### 8.2 性能优化
+### 9.2 性能优化
 
 - 使用线程池而非每次创建新线程
-- 添加连接超时和请求超时配置
 - 实现静态文件的缓存机制
 - 使用select/poll/epoll处理高并发
+- 添加连接限流
 
-### 8.3 安全增强
+### 9.3 安全增强
 
 - 添加请求频率限制
 - 实现基本的身份认证
 - 添加HTTPS支持（SSL/TLS）
-- 实现日志记录和访问统计
-
----
-
-## 九、常见问题
-
-### Q1: 为什么使用HTTP/1.0而不是HTTP/1.1？
-
-A: HTTP/1.0使用短连接（每请求关闭连接），实现简单，适合教学目的。HTTP/1.1支持长连接、管道化等高级特性，但实现复杂度更高。
-
-### Q2: 为什么设置Socket超时？
-
-A: 防止恶意的半开连接长期占用服务器资源。设置合理的超时时间可以及时释放资源。
-
-### Q3: 工作线程数量如何确定？
-
-A: 对于IO密集型任务（如文件服务），线程数可以多一些（4-8个）。对于CPU密集型任务，线程数应该接近CPU核心数（2-4个）。
-
-### Q4: 如何处理大文件？
-
-A: 当前实现将整个文件读入内存。小文件没问题，大文件可能占用过多内存。可以改为分块读取和发送。
-
-### Q5: 为什么需要路径安全检查？
-
-A: 防止路径穿越攻击。恶意用户可能构造 `/../../etc/passwd` 这样的URL，尝试访问Web目录之外的文件。
+- 实现更详细的日志和监控
 
 ---
 
