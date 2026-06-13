@@ -1,34 +1,19 @@
 """
 ================================================================================
-响应处理模块
+响应服务模块
 ================================================================================
 
-【模块功能】
-负责HTTP响应的生成，构造符合HTTP协议的响应报文。
+【模块说明】
+负责HTTP响应的生成。
 
-【模块职责】
-1. 构建完整的HTTP响应报文
-2. 生成错误页面
-3. 处理MIME类型和字符编码
-
-【响应格式】
-HTTP/1.0 200 OK\r\n
-Server: SimplePythonServer/1.0\r\n
-Content-Type: text/html; charset=utf-8\r\n
-Content-Length: 1234\r\n
-Connection: close\r\n
-\r\n
-<响应体>
-
-【设计原则】
-- 单一职责：只负责响应生成
-- 格式化响应：响应格式符合HTTP规范
-- 错误处理：为各种错误情况提供默认响应
+【服务内容】
+- HTTPResponse 类：响应数据封装
+- build_response 函数：构建成功响应
+- build_error_response 函数：构建错误响应
+- get_error_description 函数：获取错误描述
 
 ================================================================================
 """
-
-from typing import Optional
 
 # HTTP状态码与状态短语映射
 STATUS_PHRASES = {
@@ -46,39 +31,32 @@ class HTTPResponse:
     """
     HTTP响应类
     
-    【设计说明】
-    封装HTTP响应的所有信息，包括状态码、内容、头部等。
-    
     【属性】
         status_code: HTTP状态码
         content_type: MIME类型
-        body: 响应体内容（字节）
+        body: 响应体内容
         headers: 额外的响应头
     """
     
     def __init__(
         self,
-        status_code: int = 200,
-        content_type: str = "text/html",
-        body: bytes = b"",
-        headers: Optional[dict] = None
+        status_code=200,
+        content_type="text/html",
+        body=b"",
+        headers=None
     ):
         self.status_code = status_code
         self.content_type = content_type
         self.body = body
         self.headers = headers or {}
     
-    def to_bytes(self, server_name: str = "SimplePythonServer/1.0") -> bytes:
+    def to_bytes(self, server_name="SimplePythonServer/1.0"):
         """
         将响应对象转换为HTTP响应字节数据
-        
-        参数：
-            server_name: 服务器标识
         
         返回：
             完整的HTTP响应字节数据
         """
-        # 获取状态短语
         status_phrase = STATUS_PHRASES.get(self.status_code, "Unknown")
         
         # 处理字符编码
@@ -93,8 +71,7 @@ class HTTPResponse:
             f"Content-Type: {content_type}",
             f"Content-Length: {len(self.body)}",
             "Connection: close",
-            "Cache-Control: public, max-age=86400",
-            "Expires: Wed, 31 Dec 2025 23:59:59 GMT"
+            "Cache-Control: public, max-age=86400"
         ]
         
         # 添加自定义头部
@@ -104,15 +81,10 @@ class HTTPResponse:
         # 空行分隔头部和主体
         response_headers.append("")
         
-        # 组装完整响应
         return '\r\n'.join(response_headers).encode('utf-8') + self.body
 
 
-def build_response(
-    status_code: int,
-    content_type: str,
-    body: bytes
-) -> bytes:
+def build_response(status_code, content_type, body):
     """
     快捷构建HTTP响应
     
@@ -128,13 +100,9 @@ def build_response(
     return response.to_bytes()
 
 
-def build_error_response(status_code: int) -> bytes:
+def build_error_response(status_code):
     """
     构建错误响应页面
-    
-    【设计说明】
-    为常见错误生成美观的HTML错误页面。
-    页面使用内联CSS，无需额外请求。
     
     参数：
         status_code: HTTP错误状态码
@@ -145,7 +113,6 @@ def build_error_response(status_code: int) -> bytes:
     status_phrase = STATUS_PHRASES.get(status_code, "Unknown")
     error_description = get_error_description(status_code)
     
-    # 构建HTML错误页面
     error_html = f"""
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -216,7 +183,7 @@ def build_error_response(status_code: int) -> bytes:
     return build_response(status_code, "text/html", error_html.encode('utf-8'))
 
 
-def get_error_description(status_code: int) -> str:
+def get_error_description(status_code):
     """
     获取错误描述
     

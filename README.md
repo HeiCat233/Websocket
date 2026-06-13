@@ -35,47 +35,47 @@ www/
 
 ```
 webserver/
-├── www/                        # 文档根目录（Web资源存放处）
-│   ├── index.html              # 博客首页
-│   ├── about.html              # 关于页面
-│   ├── style.css               # 全局样式表
+├── config/                     # 配置目录
+│   └── __init__.py             # 配置管理（ServerConfig类）
+├── controllers/                 # 控制器目录
+│   ├── __init__.py             # 控制器导出
+│   ├── static_controller.py    # 静态文件控制器
+│   └── error_controller.py     # 错误处理控制器
+├── routes/                      # 路由目录
+│   └── __init__.py             # 路由管理（Router类）
+├── services/                    # 服务目录
+│   ├── __init__.py             # 服务导出
+│   ├── request_service.py      # 请求解析服务
+│   ├── response_service.py     # 响应生成服务
+│   └── file_service.py         # 文件处理服务
+├── utils/                       # 工具函数目录
+│   └── __init__.py             # URL编解码等工具函数
+├── www/                         # 静态资源目录（文档根目录）
+│   ├── index.html
+│   ├── about.html
+│   ├── style.css
 │   └── article/
-│       ├── post1.html          # 文章一：Web服务器实现原理
-│       └── post2.html          # 文章二：多线程编程最佳实践
-├── src/                        # 源代码目录
-│   ├── __init__.py             # 包初始化模块
-│   ├── main.py                 # 程序入口
-│   ├── config.py               # 【新增】配置管理模块
-│   ├── utils.py                # 【新增】工具函数模块
-│   ├── request.py              # 【重构】请求处理模块
-│   ├── response.py             # 【重构】响应生成模块
-│   ├── storage.py              # 【重构】文件处理模块（数据访问层）
-│   ├── middleware.py           # 【新增】中间件模块
-│   ├── router.py               # 【新增】路由处理模块
-│   └── server.py               # 【重构】服务器核心模块
-└── README.md                   # 项目说明文档
+│       ├── post1.html
+│       └── post2.html
+├── app.py                       # 应用核心（WebServer类）
+├── main.py                      # 程序入口
+└── README.md                    # 项目说明文档
 ```
 
 ---
 
 ## 三、模块功能说明
 
-### 3.1 配置管理模块（`config.py`）
+### 3.1 配置模块（`config/`）
 
 **职责：** 集中管理Web服务器的所有配置参数。
 
-**设计特点：**
-- 单一数据源：所有配置集中在一个地方
-- 环境变量支持：可通过环境变量覆盖
-- 类型安全：明确的类型定义
-- 默认值：合理的默认值
-
 **核心类：**
 
-| 类/函数 | 功能说明 |
-|--------|---------|
-| `ServerConfig` | 服务器配置类，封装所有配置项 |
-| `config` | 全局配置单例实例 |
+| 类 | 功能说明 |
+|------|---------|
+| `Settings` | 服务器配置类，封装所有配置项 |
+| `settings` | 全局配置单例实例 |
 
 **配置项分类：**
 
@@ -88,7 +88,7 @@ webserver/
 
 ---
 
-### 3.2 工具函数模块（`utils.py`）
+### 3.2 工具模块（`utils/`）
 
 **职责：** 提供通用工具函数。
 
@@ -102,9 +102,11 @@ webserver/
 
 ---
 
-### 3.3 请求处理模块（`request.py`）
+### 3.3 服务层（`services/`）
 
-**职责：** 负责HTTP请求的解析，提取请求信息。
+#### 3.3.1 请求服务（`request_service.py`）
+
+**职责：** 负责HTTP请求的解析。
 
 **核心类与函数：**
 
@@ -114,54 +116,36 @@ webserver/
 | `parse_request(raw_data)` | 函数 | 解析原始HTTP请求字节数据 |
 | `RequestValidator` | 类 | 请求验证器，提供方法验证 |
 
-**HTTPRequest数据类属性：**
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `method` | str | HTTP方法（GET、POST等） |
-| `path` | str | 请求路径（如/index.html） |
-| `version` | str | HTTP版本（如HTTP/1.0） |
-| `raw_data` | bytes | 原始请求字节数据 |
-
 **RequestValidator验证规则：**
 - 请求方法必须是GET
 - 请求路径必须合法
 - 不包含危险字符（.., \\）
 
----
+#### 3.3.2 响应服务（`response_service.py`）
 
-### 3.4 响应生成模块（`response.py`）
-
-**职责：** 负责HTTP响应的生成，构造符合HTTP协议的响应报文。
+**职责：** 负责HTTP响应的生成。
 
 **核心类与函数：**
 
 | 名称 | 功能说明 |
 |------|---------|
-| `HTTPResponse` | 响应类，封装响应信息，支持链式调用 |
-| `build_response(status_code, content_type, body)` | 快捷构建HTTP响应 |
-| `build_error_response(status_code)` | 构建HTML错误页面 |
-| `get_error_description(status_code)` | 获取错误描述 |
-
-**HTTPResponse类特点：**
-- 使用`to_bytes()`方法转换为完整的HTTP响应字节
-- 自动添加Server、Content-Type、Content-Length等头部
-- 支持自定义头部
+| `HTTPResponse` | 类 | 响应类，封装响应信息 |
+| `build_response(status_code, content_type, body)` | 函数 | 构建成功响应 |
+| `build_error_response(status_code)` | 函数 | 构建错误响应页面 |
+| `get_error_description(status_code)` | 函数 | 获取错误描述 |
 
 **支持的状态码：** 200, 400, 403, 404, 405, 408, 500
 
----
+#### 3.3.3 文件服务（`file_service.py`）
 
-### 3.5 文件处理模块（`storage.py`）
-
-**职责：** 处理所有文件系统操作，包括路径解析、安全检查、MIME类型映射、文件读取。
+**职责：** 处理所有文件系统操作。
 
 **核心类：**
 
 | 类 | 功能说明 |
 |------|---------|
 | `PathResolver` | 路径解析器，负责URL到文件路径的转换和安全检查 |
-| `FileHandler` | 文件处理器，负责读取文件内容 |
+| `FileService` | 文件处理器，负责读取文件内容 |
 
 **PathResolver处理流程：**
 1. 处理默认首页（/ → /index.html）
@@ -170,77 +154,35 @@ webserver/
 4. 规范化路径（处理.和..）
 5. 安全边界检查
 
-**FileHandler读取流程：**
-1. 解析文件路径
-2. 检查路径安全性
-3. 验证文件存在且为普通文件
-4. 读取文件内容
-5. 返回内容和MIME类型
-
 **MIME类型支持：** .html, .css, .js, .png, .jpg, .gif, .txt等
 
 ---
 
-### 3.6 中间件模块（`middleware.py`）
+### 3.4 控制器层（`controllers/`）
 
-**职责：** 提供请求处理的中间件机制，支持请求/响应的预处理。
+**职责：** 处理HTTP请求并返回响应。
 
-**核心概念：**
-- 中间件是一种拦截器模式
-- 请求经过多个中间件形成处理链
-- 支持快速失败（短路响应）
-
-**核心类与函数：**
-
-| 名称 | 功能说明 |
-|------|---------|
-| `MiddlewareChain` | 中间件链管理器，管理中间件的执行顺序 |
-| `logging_middleware` | 日志记录中间件 |
-| `method_validator_middleware` | 方法验证中间件 |
-| `RequestLogger` | 请求日志记录器 |
-
-**中间件签名：**
-```python
-Middleware = Callable[[HTTPRequest], Tuple[bool, Optional[HTTPResponse]]]
-```
-
-**使用示例：**
-```python
-chain = MiddlewareChain()
-chain.use(logging_middleware)
-chain.use(method_validator_middleware)
-should_continue, response = chain.execute(request)
-```
+| 控制器 | 功能说明 |
+|--------|---------|
+| `StaticFileController` | 处理静态文件请求 |
+| `ErrorController` | 处理各种HTTP错误响应 |
 
 ---
 
-### 3.7 路由处理模块（`router.py`）
+### 3.5 路由层（`routes/`）
 
-**职责：** 管理请求路由，将URL路径映射到对应的处理函数。
+**职责：** 管理请求路由，将URL路径映射到对应的控制器。
 
 **核心类：**
 
 | 类 | 功能说明 |
 |------|---------|
 | `Route` | 路由类，封装路由信息 |
-| `StaticFileHandler` | 静态文件处理器 |
 | `Router` | 路由管理器，处理请求分发 |
-
-**Router特点：**
-- 支持静态路由注册
-- 支持路由装饰器（`@router.route('/path')`）
-- 未匹配路由自动使用静态文件处理器
-
-**使用示例：**
-```python
-@router.route('/about')
-def about_page(request):
-    return HTTPResponse(200, 'text/html', content)
-```
 
 ---
 
-### 3.8 服务器核心模块（`server.py`）
+### 3.6 应用核心（`app.py`）
 
 **职责：** 实现Web服务器的核心功能，包括Socket通信、多线程处理。
 
@@ -257,23 +199,11 @@ def about_page(request):
 - 主线程：接收连接，生产任务
 - 工作线程池：处理请求，消费任务
 
-**WebServer主流程：**
-1. 创建TCP Socket
-2. 启动工作线程池
-3. 主循环接收连接
-4. 任务加入队列
-5. 优雅关闭
-
 ---
 
-### 3.9 程序入口（`main.py`）
+### 3.7 程序入口（`main.py`）
 
 **职责：** 提供程序入口，启动Web服务器。
-
-**启动方式：**
-```bash
-python src/main.py
-```
 
 ---
 
@@ -287,31 +217,36 @@ python src/main.py
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                       server.py                              │
-│               WebServer, WorkerThread                        │
+│                         app.py                               │
+│               WebServer, ClientHandler                        │
 └──────────┬──────────────────┬───────────────────┬──────────┘
            │                  │                   │
            ▼                  ▼                   ▼
 ┌──────────────────┐ ┌────────────────┐ ┌────────────────────┐
-│    router.py     │ │  middleware.py │ │     request.py     │
-│   Router         │ │ MiddlewareChain│ │   HTTPRequest      │
-│ StaticFileHandler│ │                │ │  parse_request     │
+│    routes/        │ │  controllers/  │ │     services/     │
+│   Router         │ │ StaticFileController│ │ request_service  │
+│                  │ │ ErrorController  │ │ response_service  │
 └────────┬─────────┘ └───────┬────────┘ └────────┬───────────┘
          │                   │                  │
          │                   │                  │
          ▼                   │                  ▼
 ┌──────────────────┐        │         ┌────────────────────┐
-│    storage.py    │        │         │    response.py     │
-│  PathResolver    │        │         │   HTTPResponse      │
-│   FileHandler    │        │         │  build_response     │
-└──────────────────┘        │         └────────────────────┘
+│   controllers/    │        │         │     file_service    │
+│ StaticFileController│     │         │   PathResolver     │
+└──────────────────┘        │         └────────┬───────────┘
+                           │                  │
+                           │                  ▼
+                  ┌────────┴────────┐  ┌────────────────────┐
+                  │    services/    │  │     config/        │
+                  │ request_service │  │    Settings        │
+                  │ response_service│  └────────────────────┘
+                  └─────────────────┘
                            │
                            ▼
-                  ┌────────────────────┐
-                  │     config.py       │
-                  │   ServerConfig      │
-                  │      config         │
-                  └────────────────────┘
+                  ┌─────────────────┐
+                  │     utils/      │
+                  │   url_decode    │
+                  └─────────────────┘
 ```
 
 ---
@@ -346,7 +281,14 @@ python src/main.py
 
 ```bash
 cd webserver
-python src/main.py
+python -m main
+```
+
+或
+
+```bash
+cd webserver
+python main.py
 ```
 
 ### 6.2 服务器启动信息
@@ -408,13 +350,13 @@ python src/main.py
 
 ### 8.2 学习路径
 
-1. **config.py**：了解配置管理机制
-2. **request.py**：理解HTTP请求解析
-3. **response.py**：掌握响应报文构建
-4. **storage.py**：学习路径安全和文件处理
-5. **middleware.py**：理解中间件模式
-6. **router.py**：掌握路由分发
-7. **server.py**：理解服务器核心架构
+1. **config/**: 了解配置管理机制
+2. **services/request_service.py**: 理解HTTP请求解析
+3. **services/response_service.py**: 掌握响应报文构建
+4. **services/file_service.py**: 学习路径安全和文件处理
+5. **controllers/**: 理解请求处理流程
+6. **routes/**: 掌握路由分发
+7. **app.py**: 理解服务器核心架构
 
 ---
 
